@@ -9,7 +9,8 @@ from services.TelegramBot import *
 
 
 class KMSHService:
-    def __init__(self):
+    def __init__(self, settings=None):
+        self.settings = settings
         self.reset()
 
     def reset(self):
@@ -22,7 +23,8 @@ class KMSHService:
 
     def get_browser(self):
         options = ChromeOptions()
-        options.headless = True
+        if dict_get(self.settings, 'bg', None) is True:
+            options.headless = True
         return webdriver.Chrome(self.chrome_driver_path, options=options)
 
     def check_required(self):
@@ -62,42 +64,74 @@ class KMSHService:
         self.browser.find_element_by_id('UC_NetRegFirst2_Button_Submit').click()
         self.alert_accept()
 
-    def enterDept(self):
+    def enter_dept(self):
         # 進入科別
-        xpathOfFuChanKe = '//*[@id="UC_NetRegDept1_UC_婦產科_UC_LinkList1_Panel_Link"]/table/tbody/tr/td/a'
-        clickFuChanKe = self.browser.find_element_by_xpath(xpathOfFuChanKe).click()
+        selector_of_depts = 'a.treea'
+        depts = self.browser.find_elements_by_css_selector(selector_of_depts)
+        for dept in depts:
+            if dept.text == dict_get(self.settings, 'dept', None):
+                dept.click()
+                return True
+        return False
 
-    def enterTab(self):
-        # 選取夜間頁籤
-        xpathTabOfNight = '//*[@id="UC_NetRegSchedule1_Link_Night"]'
-        clickTabOfNight = self.browser.find_element_by_xpath(xpathTabOfNight).click()
+    def enter_tab(self):
+        # 選取時段頁籤
+        noon_type = dict_get(self.settings, 'noonType', None)
+        xpath_tab_of_noon_type = '//*[@id="UC_NetRegSchedule1_Link_{}"]'.format(noon_type)
+        self.browser.find_element_by_xpath(xpath_tab_of_noon_type).click()
+        return True
 
-    def selectDoctorOfDate(self):
-        # 選取掛號醫生&日期
-        # xpathDoctorOfDate = '//*[@id="UC_NetRegSchedule1_ctl00_Panel_Schedule"]/table/tbody/tr[1]/td[3]/a'
-        xpathDoctorOfDate = '//*[@id="UC_NetRegSchedule1_ctl00_Panel_Schedule"]/table/tbody/tr[1]/td[2]/a'
-        targetDoctorOfDate = self.browser.find_element_by_xpath(xpathDoctorOfDate).click()
+    def select_doctor_of_date(self):
+        # 取得頁面上所有的醫師看診時間
+        selector_doctor_of_date = '#UC_NetRegSchedule1_ctl00_Panel_Schedule table tr td'
+        doctors_of_date = self.browser.find_elements_by_css_selector(selector_doctor_of_date)
 
-    def switchToRegPage(self):
+        for doctor_of_date in doctors_of_date:
+            # 第一個 span 為醫師看診日期
+            if doctor_of_date.find_elements_by_css_selector('span')[0].text != dict_get(self.settings, 'date', None):
+                continue
+
+            # link 為掛號連結, 這邊為了確認是否 exist 用了 find_elements_by_css 避開直接查找元素的錯誤
+            if len(doctor_of_date.find_elements_by_css_selector('a')) == 0:
+                continue
+
+            # 若查找條件過了, 即可確認元素存在可直接取用
+            if doctor_of_date.find_element_by_css_selector('a').text != dict_get(self.settings, 'doctor', None):
+                continue
+
+            # 若上述條件都通過時才會點選到下一步
+            doctor_of_date.find_element_by_css_selector('a').click()
+            return True
+
+        return False
+
+    def switch_to_reg_page(self):
         # 切換至掛號系統表單 [另開視窗, 取最後一個 window]
         self.browser.switch_to.window(self.browser.window_handles[-1])
 
-    def sendRegForm(self):
+    def send_reg_form(self):
         # 送出掛號
         self.browser.find_element_by_id('Button_SendReg').click()
 
-    def checkRegResult(self):
+    def check_reg_result(self):
         # 確認是否掛號成功
-        reg_result = self.browser \
-            .find_element_by_xpath('//*[@id="Label_NetRegStatus"]/font') \
-            .get_attribute('innerText')
+        xpath_reg_result_msg = '//*[@id="Label_NetRegStatus"]/font'
+        reg_result = self.browser.find_element_by_xpath(xpath_reg_result_msg).get_attribute('innerText')
         return reg_result == "掛號成功"
 
     def send_message_for_reg_success(self):
-        self.tg.send_message(self.chat_id, "掛號成功")
+        msg = 'Dr.{} 於 {} 預約掛號成功!'.format(
+            dict_get(self.settings, 'doctor', None),
+            dict_get(self.settings, 'date', None)
+        )
+        self.tg.send_message(self.chat_id, msg)
 
     def send_message_for_reg_fail(self):
-        self.tg.send_message(self.chat_id, "掛號失敗")
+        msg = 'Dr.{} 於 {} 預約掛號失敗!'.format(
+            dict_get(self.settings, 'doctor', None),
+            dict_get(self.settings, 'date', None)
+        )
+        self.tg.send_message(self.chat_id, msg)
 
     def clean(self):
         self.browser.quit()
@@ -109,12 +143,17 @@ class KMSHService:
             self.visit()
             self.switch_to_iframe('mainframe')
             self.login()
-            self.enterDept()
-            self.enterTab()
-            self.selectDoctorOfDate()
-            self.switchToRegPage()
-            self.sendRegForm()
-            if self.checkRegResult() is True:
+            self.enter_dept()
+            self.enter_tab()
+            if self.select_doctor_of_date() is False:
+                msg = 'Dr.{} 於 {} 目前無法預約掛號!'.format(
+                    dict_get(self.settings, 'doctor', None),
+                    dict_get(self.settings, 'date', None)
+                )
+                raise Exception(msg)
+            self.switch_to_reg_page()
+            self.send_reg_form()
+            if self.check_reg_result() is True:
                 self.send_message_for_reg_success()
             else:
                 self.send_message_for_reg_fail()
