@@ -87,6 +87,11 @@ class KMSHService:
         doctors_of_date = self.browser.find_elements_by_css_selector(selector_doctor_of_date)
 
         for doctor_of_date in doctors_of_date:
+
+            # 若格子內無資料則跳過
+            if len(doctor_of_date.get_attribute('innerHTML').strip()) == 0:
+                continue
+
             # 第一個 span 為醫師看診日期
             if doctor_of_date.find_elements_by_css_selector('span')[0].text != dict_get(self.settings, 'date', None):
                 continue
