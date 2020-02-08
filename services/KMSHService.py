@@ -142,7 +142,7 @@ class KMSHService:
         self.browser.quit()
         self.reset()
 
-    def handle(self):
+    def register(self):
         self.check_required()
         try:
             self.visit()
