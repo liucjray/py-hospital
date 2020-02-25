@@ -9,7 +9,7 @@ if __name__ == '__main__':
                 'bg': True,
             }),
         ]:
-            scheduler.add_job(job.register, 'interval', seconds=10)
+            scheduler.add_job(job.query, 'interval', seconds=10)
 
         scheduler.start()
     except Exception as e:
