@@ -1,5 +1,6 @@
 import os
 import time
+import datetime
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
@@ -76,7 +77,8 @@ class SJTAService:
             # exit()
 
             if number == last_number:
-                print('same number')
+                msg = '[{}] same number: {} '.format(datetime.datetime.now(), number)
+                print(msg)
             else:
                 self.fw(number)
                 self.tg.send_message(self.chat_id, '目前看診號碼: ' + number)
