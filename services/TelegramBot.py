@@ -22,3 +22,6 @@ class TelegramBot:
 
     def send_message(self, chat_id, text):
         return self.bot.send_message(chat_id, text)
+
+    def send_document(self, chat_id, file):
+        return self.bot.send_document(chat_id, document=file)
