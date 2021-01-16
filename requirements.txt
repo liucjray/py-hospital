@@ -1,7 +1,7 @@
 APScheduler==3.6.3
 certifi==2019.11.28
 cffi==1.14.0
-cryptography==2.8
+cryptography==3.2
 future==0.18.2
 nerodia==0.14.1
 pycparser==2.19
